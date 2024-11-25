@@ -1,9 +1,9 @@
 const express = require('express');
-const https = require('https');
+const http = require('http');
 const socketIo = require('socket.io');
 
 const app = express();
-const server = https.createServer(app);
+const server = http.createServer(app);
 const io = socketIo(server);
 
 app.use(express.static('public')); // Servir archivos estáticos
