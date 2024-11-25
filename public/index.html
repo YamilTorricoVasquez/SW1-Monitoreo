@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Peer Video Streaming</title>
+</head>
+<body>
+    <h1>Video Streaming</h1>
+    <video id="localVideo" autoplay muted></video> <!-- Video local -->
+    <div id="remoteVideos"></div> <!-- Contenedor para videos remotos -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideos = document.getElementById('remoteVideos');
+        const connections = {}; // Diccionario para almacenar conexiones activas
+        let localStream;
+
+        const config = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' } // Servidor STUN público
+            ]
+        };
+
+        async function setupLocalStream() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localVideo.srcObject = localStream;
+            } catch (error) {
+                console.error('Error al acceder a la cámara/micrófono:', error);
+            }
+        }
+
+        function createPeerConnection(userId) {
+            const peerConnection = new RTCPeerConnection(config);
+
+            // Agregar tracks locales al PeerConnection
+            localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Manejar candidatos ICE
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('signal', { to: userId, signal: { candidate: event.candidate } });
+                }
+            };
+
+            // Manejar el stream remoto
+            peerConnection.ontrack = (event) => {
+                if (!document.getElementById(userId)) {
+                    const video = document.createElement('video');
+                    video.id = userId;
+                    video.autoplay = true;
+                    video.playsinline = true;
+                    remoteVideos.appendChild(video);
+                }
+                document.getElementById(userId).srcObject = event.streams[0];
+            };
+
+            return peerConnection;
+        }
+
+        // Manejar la conexión de un nuevo usuario
+        socket.on('user-connected', async (userId) => {
+            console.log(`Usuario conectado: ${userId}`);
+
+            // Crear una nueva conexión
+            const peerConnection = createPeerConnection(userId);
+            connections[userId] = peerConnection;
+
+            // Crear y enviar una oferta
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('signal', { to: userId, signal: { description: peerConnection.localDescription } });
+        });
+
+        // Manejar la desconexión de un usuario
+        socket.on('user-disconnected', (userId) => {
+            console.log(`Usuario desconectado: ${userId}`);
+            if (connections[userId]) {
+                connections[userId].close();
+                delete connections[userId];
+                const video = document.getElementById(userId);
+                if (video) video.remove();
+            }
+        });
+
+        // Manejar señales entrantes
+        socket.on('signal', async ({ from, signal }) => {
+            console.log(`Señal recibida de ${from}:`, signal);
+
+            if (!connections[from]) {
+                connections[from] = createPeerConnection(from);
+            }
+
+            const peerConnection = connections[from];
+
+            if (signal.description) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
+
+                if (signal.description.type === 'offer') {
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit('signal', { to: from, signal: { description: peerConnection.localDescription } });
+                }
+            } else if (signal.candidate) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                } catch (error) {
+                    console.error('Error al agregar candidato ICE:', error);
+                }
+            }
+        });
+
+        setupLocalStream();
+    </script>
+</body>
+</html>
