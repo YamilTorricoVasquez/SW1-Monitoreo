@@ -1,23 +1,12 @@
-const fs = require('fs');
-const https = require('https');
 const express = require('express');
+const https = require('https');
 const socketIo = require('socket.io');
 
 const app = express();
-
-// Certificados para HTTPS
-const options = {
-    key: fs.readFileSync('path/to/privkey.pem'),
-    cert: fs.readFileSync('path/to/cert.pem'),
-};
-
-const server = https.createServer(options, app);
+const server = https.createServer(app);
 const io = socketIo(server);
 
-app.use(express.static('public'));
-
-server.listen(443, () => console.log('Servidor corriendo en HTTPS'));
-
+app.use(express.static('public')); // Servir archivos estáticos
 
 const users = {}; // Diccionario para almacenar usuarios y sus grupos
 const port = 3000; // Puerto del servidor
