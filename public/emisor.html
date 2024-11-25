@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>Emisor</h1>
-    <video id="localVideo" autoplay muted></video>
+    <video id="localVideo" autoplay muted></video> <!-- Video local -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -19,7 +19,7 @@
 
         const config = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
+                { urls: 'stun:stun.l.google.com:19302' } // Servidor STUN público
             ]
         };
 
@@ -52,6 +52,7 @@
         socket.on('user-connected', async ({ id, role }) => {
             if (role !== 'receptor') return;
 
+            console.log(`Receptor conectado: ${id}`);
             const peerConnection = createPeerConnection(id);
             connections[id] = peerConnection;
 
@@ -64,14 +65,19 @@
             const peerConnection = connections[from];
             if (!peerConnection) return;
 
-            if (signal.description) {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
-            } else if (signal.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            try {
+                if (signal.description) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
+                } else if (signal.candidate) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                }
+            } catch (error) {
+                console.error('Error al procesar señal:', error);
             }
         });
 
         socket.on('user-disconnected', (id) => {
+            console.log(`Receptor desconectado: ${id}`);
             if (connections[id]) {
                 connections[id].close();
                 delete connections[id];

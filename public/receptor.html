@@ -7,9 +7,9 @@
 </head>
 <body>
     <h1>Receptor</h1>
+    <video id="remoteVideo" autoplay playsinline></video> <!-- Video remoto -->
     <input type="text" id="groupIdInput" placeholder="Ingresa el Group ID">
     <button id="connectButton">Conectar</button>
-    <video id="remoteVideo" autoplay playsinline></video>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -45,16 +45,19 @@
                 peerConnection = createPeerConnection();
             }
 
-            if (signal.description) {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
-
-                if (signal.description.type === 'offer') {
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    socket.emit('signal', { to: from, signal: { description: peerConnection.localDescription } });
+            try {
+                if (signal.description) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
+                    if (signal.description.type === 'offer') {
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        socket.emit('signal', { to: from, signal: { description: peerConnection.localDescription } });
+                    }
+                } else if (signal.candidate) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
                 }
-            } else if (signal.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (error) {
+                console.error('Error al procesar señal:', error);
             }
         });
 
@@ -64,6 +67,7 @@
                 alert('Por favor, ingresa un Group ID válido.');
                 return;
             }
+
             socket.emit('set-role', { role: 'receptor', groupId });
         });
     </script>
