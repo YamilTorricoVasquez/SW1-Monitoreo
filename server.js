@@ -1,12 +1,23 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
-const http = require('http');
 const socketIo = require('socket.io');
 
 const app = express();
-const server = http.createServer(app);
+
+// Certificados para HTTPS
+const options = {
+    key: fs.readFileSync('path/to/privkey.pem'),
+    cert: fs.readFileSync('path/to/cert.pem'),
+};
+
+const server = https.createServer(options, app);
 const io = socketIo(server);
 
-app.use(express.static('public')); // Servir archivos estáticos
+app.use(express.static('public'));
+
+server.listen(443, () => console.log('Servidor corriendo en HTTPS'));
+
 
 const users = {}; // Diccionario para almacenar usuarios y sus grupos
 const port = 3000; // Puerto del servidor
@@ -20,12 +31,16 @@ io.on('connection', (socket) => {
             socket.disconnect();
             return;
         }
-
-        users[socket.id] = { role, groupId }; // Almacenar texto plano
-        console.log(`Usuario ${socket.id} asignado al grupo ${groupId} como ${role}`);
-        socket.join(groupId); // Unirse al grupo en el servidor
-        socket.broadcast.to(groupId).emit('user-connected', { id: socket.id, role });
+    
+        // Limpiar posibles espacios en blanco o caracteres extraños
+        const cleanGroupId = groupId.trim();
+    
+        users[socket.id] = { role, groupId: cleanGroupId };
+        console.log(`Usuario ${socket.id} asignado al grupo ${cleanGroupId} como ${role}`);
+        socket.join(cleanGroupId); // Usar `cleanGroupId` para unirse al grupo
+        socket.broadcast.to(cleanGroupId).emit('user-connected', { id: socket.id, role });
     });
+    
 
     socket.on('signal', ({ to, signal }) => {
         const sender = users[socket.id];

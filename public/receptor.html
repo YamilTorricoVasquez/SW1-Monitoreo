@@ -62,14 +62,16 @@
         });
 
         connectButton.addEventListener('click', () => {
-            const groupId = groupIdInput.value.trim();
-            if (!groupId) {
-                alert('Por favor, ingresa un Group ID válido.');
-                return;
-            }
+    let groupId = groupIdInput.value.trim(); // Eliminar espacios en blanco
+    if (!groupId) {
+        alert('Por favor, ingresa un Group ID válido.');
+        return;
+    }
 
-            socket.emit('set-role', { role: 'receptor', groupId });
-        });
+    groupId = groupId.toLowerCase(); // Normalizar a minúsculas
+    socket.emit('set-role', { role: 'receptor', groupId });
+});
+
     </script>
 </body>
 </html>
