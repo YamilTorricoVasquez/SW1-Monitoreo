@@ -20,16 +20,14 @@ io.on('connection', (socket) => {
             socket.disconnect();
             return;
         }
-    
-        // Limpiar posibles espacios en blanco o caracteres extraños
-        const cleanGroupId = groupId.trim();
-    
+
+        const cleanGroupId = groupId.trim().toLowerCase(); // Normalización
         users[socket.id] = { role, groupId: cleanGroupId };
         console.log(`Usuario ${socket.id} asignado al grupo ${cleanGroupId} como ${role}`);
-        socket.join(cleanGroupId); // Usar `cleanGroupId` para unirse al grupo
+
+        socket.join(cleanGroupId);
         socket.broadcast.to(cleanGroupId).emit('user-connected', { id: socket.id, role });
     });
-    
 
     socket.on('signal', ({ to, signal }) => {
         const sender = users[socket.id];

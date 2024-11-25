@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>Emisor</h1>
-    <video id="localVideo" autoplay muted></video> <!-- Video local -->
+    <video id="localVideo" autoplay muted playsinline></video>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -15,11 +15,11 @@
         const connections = {};
         let localStream;
 
-        const groupId = prompt("Ingresa tu Group ID"); // Solicitar el ID del grupo
+        const groupId = prompt("Ingresa tu Group ID").trim().toLowerCase();
 
         const config = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' } // Servidor STUN público
+                { urls: 'stun:stun.l.google.com:19302' }
             ]
         };
 
@@ -73,14 +73,6 @@
                 }
             } catch (error) {
                 console.error('Error al procesar señal:', error);
-            }
-        });
-
-        socket.on('user-disconnected', (id) => {
-            console.log(`Receptor desconectado: ${id}`);
-            if (connections[id]) {
-                connections[id].close();
-                delete connections[id];
             }
         });
 

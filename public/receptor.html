@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>Receptor</h1>
-    <video id="remoteVideo" autoplay playsinline></video> <!-- Video remoto -->
+    <video id="remoteVideo" autoplay playsinline></video>
     <input type="text" id="groupIdInput" placeholder="Ingresa el Group ID">
     <button id="connectButton">Conectar</button>
     <script src="/socket.io/socket.io.js"></script>
@@ -62,16 +62,13 @@
         });
 
         connectButton.addEventListener('click', () => {
-    let groupId = groupIdInput.value.trim(); // Eliminar espacios en blanco
-    if (!groupId) {
-        alert('Por favor, ingresa un Group ID válido.');
-        return;
-    }
-
-    groupId = groupId.toLowerCase(); // Normalizar a minúsculas
-    socket.emit('set-role', { role: 'receptor', groupId });
-});
-
+            const groupId = groupIdInput.value.trim().toLowerCase();
+            if (!groupId) {
+                alert('Por favor, ingresa un Group ID válido.');
+                return;
+            }
+            socket.emit('set-role', { role: 'receptor', groupId });
+        });
     </script>
 </body>
 </html>
