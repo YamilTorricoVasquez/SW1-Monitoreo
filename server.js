@@ -126,34 +126,37 @@ io.on('connection', (socket) => {
 
 server.listen(3000, () => console.log('Servidor corriendo en http://localhost:3000'));
 */
-require('dotenv').config(); // Cargar variables de entorno desde .env
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const CryptoJS = require('crypto-js'); // Librería para cifrado
-const crypto = require('crypto'); // Librería para hashing
+const CryptoJS = require('crypto-js');
+const crypto = require('crypto');
+const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-app.use(express.static('public')); // Servir archivos estáticos
+// Configurar CORS
+app.use(cors({ origin: '*' }));
 
-const users = {}; // Diccionario para almacenar usuarios y sus grupos
+// Servir archivos estáticos
+app.use(express.static('public'));
 
-// Valores sensibles desde .env
-const secretKey = process.env.SECRET_KEY; // Clave secreta
-const salt = process.env.SALT; // Salt para hashing
-const iterations = parseInt(process.env.ITERATIONS, 10); // Iteraciones para hashing
-const keyLength = parseInt(process.env.KEY_LENGTH, 10); // Longitud del hash
-const port = parseInt(process.env.PORT, 10) || 3000; // Puerto del servidor
+const users = {};
+const secretKey = process.env.SECRET_KEY;
+const salt = process.env.SALT;
+const iterations = parseInt(process.env.ITERATIONS, 10);
+const keyLength = parseInt(process.env.KEY_LENGTH, 10);
+const port = parseInt(process.env.PORT, 10) || 3000;
 
-// Función para enmascarar datos sensibles (PBKDF2)
+// Función para hashing
 function hashData(data) {
     return crypto.pbkdf2Sync(data, salt, iterations, keyLength, 'sha512').toString('hex');
 }
 
-// Función para descifrar el `groupId`
+// Función para descifrar `groupId`
 function decryptGroupId(encryptedGroupId) {
     try {
         const bytes = CryptoJS.AES.decrypt(encryptedGroupId, secretKey);
@@ -164,22 +167,17 @@ function decryptGroupId(encryptedGroupId) {
     }
 }
 
-// Endpoint para validar si un emisor está activo en un grupo
+// Validar si existe un emisor activo en un grupo
 app.get('/group/:groupId/exists', (req, res) => {
-    const groupId = hashData(req.params.groupId); // Hash del Group ID ingresado
+    const groupId = hashData(req.params.groupId);
     const emisor = Object.values(users).find(user => user.groupId === groupId && user.role === 'emisor');
-
-    if (emisor) {
-        res.status(200).send({ exists: true });
-    } else {
-        res.status(404).send({ exists: false });
-    }
+    res.send({ exists: !!emisor });
 });
 
+// Manejar conexiones de WebSocket
 io.on('connection', (socket) => {
     console.log(`Usuario conectado: ${socket.id}`);
 
-    // Manejar la asignación de roles
     socket.on('set-role', ({ role, encryptedGroupId }) => {
         const groupId = decryptGroupId(encryptedGroupId);
         if (!groupId) {
@@ -189,48 +187,31 @@ io.on('connection', (socket) => {
         }
 
         const hashedGroupId = hashData(groupId);
-
-        if (role === 'receptor') {
-            // Validar si hay un emisor activo
-            const emisor = Object.values(users).find(user => user.groupId === hashedGroupId && user.role === 'emisor');
-            if (!emisor) {
-                console.log(`Conexión denegada para ${socket.id}: no hay un emisor activo en el grupo ${hashedGroupId}`);
-                socket.disconnect();
-                return;
-            }
-        }
-
         users[socket.id] = { role, groupId: hashedGroupId };
-        console.log(`Usuario ${socket.id} asignado al grupo ${hashedGroupId} como ${role}`);
         socket.join(groupId);
-        socket.broadcast.to(groupId).emit('user-connected', { id: socket.id, role });
+        console.log(`Usuario ${socket.id} asignado al grupo ${hashedGroupId} como ${role}`);
     });
 
-    // Manejar señales
     socket.on('signal', ({ to, signal }) => {
         const sender = users[socket.id];
-        if (!sender) return;
-
         const recipient = users[to];
         if (!recipient || sender.groupId !== recipient.groupId) {
             console.log(`Intento de señalización fuera del grupo denegado: ${socket.id} → ${to}`);
             return;
         }
-
         io.to(to).emit('signal', { from: socket.id, signal });
     });
 
-    // Manejar desconexión
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
             console.log(`Usuario desconectado: ${socket.id} del grupo ${user.groupId}`);
-            socket.broadcast.to(user.groupId).emit('user-disconnected', socket.id);
             delete users[socket.id];
         }
     });
 });
 
+// Iniciar servidor
 server.listen(port, () => console.log(`Servidor corriendo en http://localhost:${port}`));
 
 
