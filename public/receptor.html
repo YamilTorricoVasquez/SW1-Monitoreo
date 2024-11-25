@@ -4,61 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receptor - Video Streaming</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .video-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            padding: 0 10px;
-        }
-        video {
-            border: 2px solid #007bff;
-            border-radius: 10px;
-            width: 100%;
-            max-width: 600px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            margin-top: 20px;
-        }
-        .navbar {
-            margin-bottom: 10px;
-        }
-        .form-container {
-            width: 100%;
-            max-width: 400px;
-        }
-    </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">Receptor</a>
-        </div>
-    </nav>
-
-    <!-- Input Form and Video -->
-    <div class="container">
-        <div class="video-container">
-            <div class="form-container">
-                <div class="input-group mb-3">
-                    <input type="text" id="groupIdInput" class="form-control" placeholder="Ingresa el Group ID" aria-label="Group ID">
-                    <button id="connectButton" class="btn btn-primary">Conectar</button>
-                </div>
-            </div>
-            <video id="remoteVideo" autoplay playsinline></video>
-        </div>
-    </div>
-
-    <!-- Bootstrap JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <h1>Receptor</h1>
+    <input type="text" id="groupIdInput" placeholder="Ingresa el Group ID">
+    <button id="connectButton">Conectar</button>
+    <video id="remoteVideo" autoplay playsinline></video>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -66,28 +17,20 @@
         const groupIdInput = document.getElementById('groupIdInput');
         const connectButton = document.getElementById('connectButton');
         let peerConnection;
-        const secretKey = 'mySecretKey123'; // Clave compartida para cifrar
 
         const config = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' } // Servidor STUN público
+                { urls: 'stun:stun.l.google.com:19302' }
             ]
         };
-
-        function encryptGroupId(groupId) {
-            return CryptoJS.AES.encrypt(groupId, secretKey).toString();
-        }
 
         function createPeerConnection() {
             const peerConnection = new RTCPeerConnection(config);
 
-            // Manejar el stream remoto
             peerConnection.ontrack = (event) => {
-                console.log('Track recibido:', event.streams[0]);
                 remoteVideo.srcObject = event.streams[0];
             };
 
-            // Manejar candidatos ICE
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
                     socket.emit('signal', { to: 'emisor', signal: { candidate: event.candidate } });
@@ -102,35 +45,26 @@
                 peerConnection = createPeerConnection();
             }
 
-            try {
-                if (signal.description) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
+            if (signal.description) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.description));
 
-                    if (signal.description.type === 'offer') {
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
-                        socket.emit('signal', { to: from, signal: { description: peerConnection.localDescription } });
-                    }
-                } else if (signal.candidate) {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                if (signal.description.type === 'offer') {
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit('signal', { to: from, signal: { description: peerConnection.localDescription } });
                 }
-            } catch (error) {
-                console.error('Error al procesar señal:', error);
-                alert('Error al conectar. Verifica el Group ID o la conexión.');
+            } else if (signal.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
             }
         });
 
-        // Conectar al grupo cuando se presione el botón
         connectButton.addEventListener('click', () => {
             const groupId = groupIdInput.value.trim();
             if (!groupId) {
                 alert('Por favor, ingresa un Group ID válido.');
                 return;
             }
-
-            const encryptedGroupId = encryptGroupId(groupId);
-            socket.emit('set-role', { role: 'receptor', encryptedGroupId });
-            groupIdInput.value = ''; // Limpiar el input después de conectarse
+            socket.emit('set-role', { role: 'receptor', groupId });
         });
     </script>
 </body>
