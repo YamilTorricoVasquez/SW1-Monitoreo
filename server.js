@@ -146,7 +146,7 @@ const secretKey = process.env.SECRET_KEY; // Clave secreta
 const salt = process.env.SALT; // Salt para hashing
 const iterations = parseInt(process.env.ITERATIONS, 10); // Iteraciones para hashing
 const keyLength = parseInt(process.env.KEY_LENGTH, 10); // Longitud del hash
-const port = parseInt(process.env.PORT, 10); // Puerto del servidor
+const port = parseInt(process.env.PORT, 10) || 3000; // Puerto del servidor
 
 // Función para enmascarar datos sensibles (PBKDF2)
 function hashData(data) {
@@ -164,9 +164,22 @@ function decryptGroupId(encryptedGroupId) {
     }
 }
 
+// Endpoint para validar si un emisor está activo en un grupo
+app.get('/group/:groupId/exists', (req, res) => {
+    const groupId = hashData(req.params.groupId); // Hash del Group ID ingresado
+    const emisor = Object.values(users).find(user => user.groupId === groupId && user.role === 'emisor');
+
+    if (emisor) {
+        res.status(200).send({ exists: true });
+    } else {
+        res.status(404).send({ exists: false });
+    }
+});
+
 io.on('connection', (socket) => {
     console.log(`Usuario conectado: ${socket.id}`);
 
+    // Manejar la asignación de roles
     socket.on('set-role', ({ role, encryptedGroupId }) => {
         const groupId = decryptGroupId(encryptedGroupId);
         if (!groupId) {
@@ -175,14 +188,25 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const hashedGroupId = hashData(groupId); // Generar hash extendido del `groupId`
+        const hashedGroupId = hashData(groupId);
 
-        users[socket.id] = { role, groupId: hashedGroupId }; // Almacenar hash
+        if (role === 'receptor') {
+            // Validar si hay un emisor activo
+            const emisor = Object.values(users).find(user => user.groupId === hashedGroupId && user.role === 'emisor');
+            if (!emisor) {
+                console.log(`Conexión denegada para ${socket.id}: no hay un emisor activo en el grupo ${hashedGroupId}`);
+                socket.disconnect();
+                return;
+            }
+        }
+
+        users[socket.id] = { role, groupId: hashedGroupId };
         console.log(`Usuario ${socket.id} asignado al grupo ${hashedGroupId} como ${role}`);
-        socket.join(groupId); // Unirse al grupo en el servidor
+        socket.join(groupId);
         socket.broadcast.to(groupId).emit('user-connected', { id: socket.id, role });
     });
 
+    // Manejar señales
     socket.on('signal', ({ to, signal }) => {
         const sender = users[socket.id];
         if (!sender) return;
@@ -196,6 +220,7 @@ io.on('connection', (socket) => {
         io.to(to).emit('signal', { from: socket.id, signal });
     });
 
+    // Manejar desconexión
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
