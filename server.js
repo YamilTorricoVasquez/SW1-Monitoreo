@@ -126,37 +126,34 @@ io.on('connection', (socket) => {
 
 server.listen(3000, () => console.log('Servidor corriendo en http://localhost:3000'));
 */
-require('dotenv').config();
+require('dotenv').config(); // Cargar variables de entorno desde .env
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const CryptoJS = require('crypto-js');
-const crypto = require('crypto');
-const cors = require('cors');
+const CryptoJS = require('crypto-js'); // Librería para cifrado
+const crypto = require('crypto'); // Librería para hashing
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Configurar CORS
-app.use(cors({ origin: '*' }));
+app.use(express.static('public')); // Servir archivos estáticos
 
-// Servir archivos estáticos
-app.use(express.static('public'));
+const users = {}; // Diccionario para almacenar usuarios y sus grupos
 
-const users = {};
-const secretKey = process.env.SECRET_KEY;
-const salt = process.env.SALT;
-const iterations = parseInt(process.env.ITERATIONS, 10);
-const keyLength = parseInt(process.env.KEY_LENGTH, 10);
-const port = parseInt(process.env.PORT, 10) || 3000;
+// Valores sensibles desde .env
+const secretKey = process.env.SECRET_KEY; // Clave secreta
+const salt = process.env.SALT; // Salt para hashing
+const iterations = parseInt(process.env.ITERATIONS, 10); // Iteraciones para hashing
+const keyLength = parseInt(process.env.KEY_LENGTH, 10); // Longitud del hash
+const port = parseInt(process.env.PORT, 10); // Puerto del servidor
 
-// Función para hashing
+// Función para enmascarar datos sensibles (PBKDF2)
 function hashData(data) {
     return crypto.pbkdf2Sync(data, salt, iterations, keyLength, 'sha512').toString('hex');
 }
 
-// Función para descifrar `groupId`
+// Función para descifrar el `groupId`
 function decryptGroupId(encryptedGroupId) {
     try {
         const bytes = CryptoJS.AES.decrypt(encryptedGroupId, secretKey);
@@ -167,14 +164,6 @@ function decryptGroupId(encryptedGroupId) {
     }
 }
 
-// Validar si existe un emisor activo en un grupo
-app.get('/group/:groupId/exists', (req, res) => {
-    const groupId = hashData(req.params.groupId);
-    const emisor = Object.values(users).find(user => user.groupId === groupId && user.role === 'emisor');
-    res.send({ exists: !!emisor });
-});
-
-// Manejar conexiones de WebSocket
 io.on('connection', (socket) => {
     console.log(`Usuario conectado: ${socket.id}`);
 
@@ -186,19 +175,24 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const hashedGroupId = hashData(groupId);
-        users[socket.id] = { role, groupId: hashedGroupId };
-        socket.join(groupId);
+        const hashedGroupId = hashData(groupId); // Generar hash extendido del `groupId`
+
+        users[socket.id] = { role, groupId: hashedGroupId }; // Almacenar hash
         console.log(`Usuario ${socket.id} asignado al grupo ${hashedGroupId} como ${role}`);
+        socket.join(groupId); // Unirse al grupo en el servidor
+        socket.broadcast.to(groupId).emit('user-connected', { id: socket.id, role });
     });
 
     socket.on('signal', ({ to, signal }) => {
         const sender = users[socket.id];
+        if (!sender) return;
+
         const recipient = users[to];
         if (!recipient || sender.groupId !== recipient.groupId) {
             console.log(`Intento de señalización fuera del grupo denegado: ${socket.id} → ${to}`);
             return;
         }
+
         io.to(to).emit('signal', { from: socket.id, signal });
     });
 
@@ -206,12 +200,12 @@ io.on('connection', (socket) => {
         const user = users[socket.id];
         if (user) {
             console.log(`Usuario desconectado: ${socket.id} del grupo ${user.groupId}`);
+            socket.broadcast.to(user.groupId).emit('user-disconnected', socket.id);
             delete users[socket.id];
         }
     });
 });
 
-// Iniciar servidor
 server.listen(port, () => console.log(`Servidor corriendo en http://localhost:${port}`));
 
 

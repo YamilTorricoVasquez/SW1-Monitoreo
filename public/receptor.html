@@ -16,18 +16,23 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 80vh;
+            height: 100vh;
+            padding: 0 10px;
         }
         video {
             border: 2px solid #007bff;
             border-radius: 10px;
             width: 100%;
-            max-width: 800px;
+            max-width: 600px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             margin-top: 20px;
         }
         .navbar {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+        .form-container {
+            width: 100%;
+            max-width: 400px;
         }
     </style>
 </head>
@@ -39,12 +44,14 @@
         </div>
     </nav>
 
-    <!-- Input Form -->
+    <!-- Input Form and Video -->
     <div class="container">
         <div class="video-container">
-            <div class="input-group mb-3" style="max-width: 400px;">
-                <input type="text" id="groupIdInput" class="form-control" placeholder="Ingresa el Group ID" aria-label="Group ID">
-                <button id="connectButton" class="btn btn-primary">Conectar</button>
+            <div class="form-container">
+                <div class="input-group mb-3">
+                    <input type="text" id="groupIdInput" class="form-control" placeholder="Ingresa el Group ID" aria-label="Group ID">
+                    <button id="connectButton" class="btn btn-primary">Conectar</button>
+                </div>
             </div>
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
@@ -109,6 +116,7 @@
                 }
             } catch (error) {
                 console.error('Error al procesar señal:', error);
+                alert('Error al conectar. Verifica el Group ID o la conexión.');
             }
         });
 
@@ -122,6 +130,7 @@
 
             const encryptedGroupId = encryptGroupId(groupId);
             socket.emit('set-role', { role: 'receptor', encryptedGroupId });
+            groupIdInput.value = ''; // Limpiar el input después de conectarse
         });
     </script>
 </body>
