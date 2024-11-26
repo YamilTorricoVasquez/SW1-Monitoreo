@@ -7,11 +7,9 @@
 </head>
 <body>
     <h1>Emisor</h1>
-    <video id="localVideo" autoplay muted playsinline></video>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const localVideo = document.getElementById('localVideo');
         const connections = {};
         let localStream;
 
@@ -25,11 +23,19 @@
 
         async function setupLocalStream() {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                localVideo.srcObject = localStream;
+                // Solicitar la cámara trasera
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { exact: "environment" } // "environment" selecciona la cámara trasera
+                    },
+                    audio: true
+                });
+
+                // Emitir la función del emisor al servidor
                 socket.emit('set-role', { role: 'emisor', groupId });
             } catch (error) {
                 console.error('Error al acceder a la cámara/micrófono:', error);
+                alert("No se pudo acceder a la cámara trasera. Verifica los permisos.");
             }
         }
 
