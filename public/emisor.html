@@ -12,6 +12,7 @@
         const socket = io();
         const connections = {};
         let localStream;
+        let wakeLock = null;
 
         const groupId = prompt("Ingresa tu Group ID").trim().toLowerCase();
 
@@ -33,6 +34,9 @@
 
                 // Emitir la función del emisor al servidor
                 socket.emit('set-role', { role: 'emisor', groupId });
+
+                // Intentar activar Wake Lock
+                requestWakeLock();
             } catch (error) {
                 console.error('Error al acceder a la cámara/micrófono:', error);
                 alert("No se pudo acceder a la cámara trasera. Verifica los permisos.");
@@ -81,6 +85,27 @@
                 console.error('Error al procesar señal:', error);
             }
         });
+
+        async function requestWakeLock() {
+            try {
+                // Activar Wake Lock para evitar suspensión
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Wake Lock activado.');
+
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock desactivado.');
+                });
+
+                // Volver a activar Wake Lock si se pierde
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible' && !wakeLock) {
+                        requestWakeLock();
+                    }
+                });
+            } catch (err) {
+                console.error('Error al activar Wake Lock:', err);
+            }
+        }
 
         setupLocalStream();
     </script>
