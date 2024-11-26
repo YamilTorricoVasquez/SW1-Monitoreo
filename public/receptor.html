@@ -4,12 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receptor - Video Streaming</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .video-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+        video {
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .input-group {
+            max-width: 400px;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-    <h1>Receptor</h1>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <input type="text" id="groupIdInput" placeholder="Ingresa el Group ID">
-    <button id="connectButton">Conectar</button>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Receptor - Video Streaming</a>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="video-container">
+            <!-- Input for Group ID -->
+            <div class="input-group mb-4">
+                <input type="text" id="groupIdInput" class="form-control" placeholder="Ingresa el Group ID">
+                <button id="connectButton" class="btn btn-primary">Conectar</button>
+            </div>
+            <!-- Video Element -->
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
